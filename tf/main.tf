@@ -129,7 +129,7 @@ resource "aws_key_pair" "ssh_key" {
 resource "aws_instance" "ono_server" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = "t2.large"
-  # user_data                   = file("install_pullenti.sh")
+  user_data                   = file("./ono-server/install_server.sh")
   key_name                    = aws_key_pair.ssh_key.key_name
   subnet_id                   = aws_subnet.public_subnet.id
   security_groups             = [aws_security_group.allow_defaults.id]
