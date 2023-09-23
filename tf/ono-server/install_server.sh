@@ -1,3 +1,5 @@
+#!/bin/bash
+
 sudo apt update
 sudo apt install -y software-properties-common
 
@@ -18,11 +20,40 @@ curl -sS https://bootstrap.pypa.io/get-pip.py | python3
 python3 -m pip install virtualenv
 
 # install pullenti server
-sudo docker pull pullenti/pullenti-server
-sudo docker run -d --name pullenti --platform linux/amd64 -v /tmp/ner/pullenti-server/conf.xml:/app/conf.xml -p 8081:8080 pullenti/pullenti-server
+docker network create --driver bridge pullenti-net
+docker pull pullenti/pullenti-server
+docker run -d \
+  --name pullenti \
+  --network pullenti-net \
+  --platform linux/amd64 \
+  -v /tmp/ner/pullenti-server/conf.xml:/app/conf.xml \
+  -p 8081:8080 \
+  pullenti/pullenti-server
 
 # install pullenti client
-cp /tmp/ner/pullenti-client-setup.py ./pullenti-client/setup.py
-cp /tmp/ner/pullenti-client-demo.py ./pullenti-client/demo.py
+mkdir -p "/home/ubuntu/pullenti-client"
+mkdir -p "/home/ubuntu/pullenti-client/notebooks"
+cp /tmp/ner/demo/setup.py /home/ubuntu/pullenti-client/setup.py
+cp /tmp/ner/demo/script.py /home/ubuntu/pullenti-client/demo.py
+cp /tmp/ner/demo/notebook.ipynb /home/ubuntu/pullenti-client/notebooks/demo.ipynb
+
 python3 -m venv ./pullenti-client/vevn
 python3 -m pip install -e ./pullenti-client
+
+# install jupyter notebook
+docker pull jupyter/minimal-notebook
+# run a container with `1234` password
+docker run -d \
+  --name notebook \
+  --network pullenti-net \
+  --platform linux/amd64 \
+  --user root \
+  -e CHOWN_HOME=yes \
+  -e CHOWN_HOME_OPTS="-R" \
+  -v "/home/ubuntu/pullenti-client/notebooks":/home/jovyan/work \
+  -p 8888:8888 \
+  jupyter/minimal-notebook \
+  start-notebook.sh --PasswordIdentityProvider.hashed_password='argon2:$argon2id$v=19$m=10240,t=10,p=8$h8jqHXGWAPwaG67oAHmKhQ$mvxwYBpVKvzUn00a+8As3njo4qgEyODAQ5VoUbIHlQw'
+
+docker exec -it notebook bash -c "sudo apt-get update"
+docker exec -it notebook bash -c "sudo apt install -y graphviz"

@@ -8,8 +8,11 @@
         <lang>ru</lang>
     </langs>
     <analyzers>
+        <analyzer>definition</analyzer>
         <analyzer>geo</analyzer>
+        <analyzer>keyword</analyzer>
         <analyzer>org</analyzer>
         <analyzer>person</analyzer>
+        <analyzer>weapon</analyzer>
     </analyzers>
 </conf>
