@@ -67,9 +67,18 @@ resource "aws_security_group" "allow_defaults" {
     protocol    = "tcp"
   }
 
+  # jupyter-notebook
+  ingress {
+    description = "HTTP"
+    cidr_blocks = ["0.0.0.0/0"]
+    from_port   = 8888
+    to_port     = 8888
+    protocol    = "tcp"
+  }
+
   # postgresql
   ingress {
-    description = "POSTGRESQL"
+    description = "PostgreSQL"
     cidr_blocks = ["0.0.0.0/0"]
     from_port   = 5432
     to_port     = 5432
@@ -128,7 +137,7 @@ resource "aws_key_pair" "ssh_key" {
 # aws instance - ono server
 resource "aws_instance" "ono_server" {
   ami                         = data.aws_ami.ubuntu.id
-  instance_type               = "t2.large"
+  instance_type               = var.instance_type_main
   user_data                   = file("./ono-server/install_server.sh")
   key_name                    = aws_key_pair.ssh_key.key_name
   subnet_id                   = aws_subnet.public_subnet.id
@@ -137,7 +146,7 @@ resource "aws_instance" "ono_server" {
 
   root_block_device {
     delete_on_termination = true
-    volume_size           = 80
+    volume_size           = 40
     volume_type           = "gp2"
   }
 
@@ -157,4 +166,16 @@ resource "aws_instance" "ono_server" {
     aws_vpc.cloud,
     aws_subnet.public_subnet
   ]
+}
+
+resource "time_sleep" "sleep_resource" {
+  destroy_duration = "120s"
+
+  depends_on       = [
+    aws_instance.ono_server
+  ]
+}
+
+resource "null_resource" "sleep_resource_waiter" {
+  depends_on = [time_sleep.sleep_resource]
 }
