@@ -66,8 +66,8 @@ python3 -m venv ./pullenti-client/vevn
 2. Copy setup and demo scripts to client folder:
 
 ```shell
-cp pullenti-client-setup.py ./pullenti-client/setup.py
-cp pullenti-client-demo.py ./pullenti-client/demo.py
+cp ./demo/setup.py ./pullenti-client/setup.py
+cp ./demo/script.py ./pullenti-client/script.py
 ```
 
 3. Install libs:
@@ -79,7 +79,8 @@ pip install -e ./pullenti-client
 4. Run puthon script:
 
 ```shell
-python3 pullenti-client/demo.py
+source ./pullenti-client/vevn/bin/activate
+python3 pullenti-client/script.py
 ```
 
 ```
