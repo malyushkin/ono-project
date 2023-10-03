@@ -400,5 +400,6 @@ archive/*
 /.idea/misc.xml
 /.idea/modules.xml
 /.idea/ono-aws.iml
-/ner/pullenti-client/vevn/
+/ner/pullenti_client/vevn/
 /.idea/vcs.xml
+!/credentials/
