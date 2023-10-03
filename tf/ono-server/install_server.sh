@@ -63,6 +63,7 @@ sudo apt-get -y install postgresql-12 postgresql-contrib-12
 sudo -u postgres -i psql --command "CREATE ROLE server SUPERUSER LOGIN PASSWORD 'server';"
 sudo -u postgres -i psql --command "CREATE DATABASE ono_db OWNER 'server';"
 sudo -u postgres -i psql --command "CREATE EXTENSION IF NOT EXISTS 'uuid-ossp';"
+sudo -u postgres -i psql -d ono_db -a -f /tmp/ner/db.sql
 
 # edit config
 cp /etc/postgresql/12/main/postgresql.conf{,.bak}

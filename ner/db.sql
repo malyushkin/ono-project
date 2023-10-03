@@ -1,15 +1,17 @@
-create table article
+create table public.article
 (
     article_id      uuid not null
         constraint article_pk
             primary key,
-    rima_article_id integer,
+    rima_article_id integer
+        constraint article_pk_2
+            unique,
     title           text,
     plain_text      text,
     published_dt    date
 );
 
-alter table article
+alter table public.article
     owner to server;
 
 create table entity

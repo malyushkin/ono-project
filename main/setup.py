@@ -12,6 +12,7 @@ setuptools.setup(
     install_requires=[
         "jupyter",
         "psycopg2",
+        "psycopg2-binary",
         f"pandas=={PANDAS_VER}",
         f"pullenti-client=={PULLENTI_CLIENT_VER}",
     ],

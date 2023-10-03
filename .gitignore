@@ -403,3 +403,4 @@ archive/*
 /ner/pullenti_client/vevn/
 /.idea/vcs.xml
 !/credentials/
+/main/nohup.out
