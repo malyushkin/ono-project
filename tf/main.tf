@@ -100,40 +100,6 @@ resource "aws_key_pair" "ssh_key" {
   public_key = file("~/.ssh/id_rsa.pub")
 }
 
-# aws instance - data base
-#resource "aws_instance" "web" {
-#  ami                         = data.aws_ami.ubuntu.id
-#  instance_type               = "t2.large"
-#  key_name                    = aws_key_pair.ssh_key.key_name
-#  user_data                   = file("install_postgres.sh")
-#  subnet_id                   = aws_subnet.public_subnet.id
-#  security_groups             = [aws_security_group.allow_defaults.id]
-#  associate_public_ip_address = true
-#
-#  root_block_device {
-#    delete_on_termination = true
-#    volume_size           = 80
-#    volume_type           = "gp2"
-#  }
-#
-#  provisioner "file" {
-#    source      = "../archive"
-#    destination = "/tmp"
-#
-#    connection {
-#      type        = "ssh"
-#      user        = "ubuntu"
-#      private_key = file("~/.ssh/id_rsa")
-#      host        = self.public_ip
-#    }
-#  }
-#
-#  depends_on = [
-#    aws_vpc.cloud,
-#    aws_subnet.public_subnet
-#  ]
-#}
-
 # aws instance - ono server
 resource "aws_instance" "ono_server" {
   ami                         = data.aws_ami.ubuntu.id
@@ -171,7 +137,7 @@ resource "aws_instance" "ono_server" {
 resource "time_sleep" "sleep_resource" {
   destroy_duration = "120s"
 
-  depends_on       = [
+  depends_on = [
     aws_instance.ono_server
   ]
 }
