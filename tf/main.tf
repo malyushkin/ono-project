@@ -145,8 +145,8 @@ resource "aws_instance" "ono_server" {
   associate_public_ip_address = true
 
   root_block_device {
-    delete_on_termination = true
-    volume_size           = 40
+    delete_on_termination = false
+    volume_size           = 50
     volume_type           = "gp2"
   }
 

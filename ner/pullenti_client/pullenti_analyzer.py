@@ -5,23 +5,10 @@ from pullenti_client.result import Match, Result
 import pandas as pd
 from typing import Any, Optional, List, Union
 
-some_text = """
-Министр внутренних дел федеральной земли Бранденбург Михаэль Штюбген обеспокоен все 
-менее контролируемой ситуацией с наплывом нелегальных мигрантов через границу с 
-соседней Польшей. "Ситуация на границе систематически ухудшается уже многие месяцы. 
-В результате число новоприбывших, регистрируемых в приемных центрах Бранденбурга, 
-значительно выросло", - заявил он в интервью газете Neue Osnabrücker Zeitung, 
-обнародованном в субботу, 16 сентября.
-
-По словам Штюбгена, сейчас федеральная полиция ежедневно направляет в приемный центр в 
-среднем по 58 мигрантов, тогда как только в июле ежедневное число предполагаемых 
-нелегалов составляло 22 человека.
-"""
-
 
 class PullentiAnalyzer:
     PULLENTI_KEYS = {"GEO", "ORGANIZATION", "PERSON"}
-    GEO_RULES = {"NA": ["name", "type"]}
+    GEO_RULES = {"NA": []}
     ORGANIZATION_RULES = {"NA": ["name"]}
     PERSON_RULES = {"NA": ["lastname"]}
 
@@ -66,9 +53,13 @@ class PullentiAnalyzer:
 
     @staticmethod
     def _data_helper(dataframe: pd.DataFrame, rules):
-        dataframe.dropna(subset=rules["NA"], how="any", inplace=True)
+        check_na = [column for column in rules["NA"] if column in dataframe.columns]
+        check_vars = [column for column in dataframe.columns if "_vars" not in column]
+
+        if any(check_na):
+            dataframe.dropna(subset=rules["NA"], how="any", inplace=True)
+        dataframe.drop_duplicates(subset=check_vars, inplace=True)
         dataframe.dropna(how="all", axis=1, inplace=True)
-        dataframe.drop_duplicates(subset=rules["NA"], inplace=True)
         return dataframe
 
     def result(self) -> Result:
@@ -87,7 +78,7 @@ class PullentiAnalyzer:
 
     def data(self, analyzer: Optional[str]) -> Optional[pd.DataFrame]:
         if not self.slots(analyzer):
-            return None
+            return pd.DataFrame(data=[])
 
         data: list[dict] = []
 
@@ -95,11 +86,12 @@ class PullentiAnalyzer:
             ner_row = {"tag": analyzer}
 
             for slot in slots:
-                if slot.key.lower() not in ner_row:
+
+                if slot.key.lower() not in ner_row and type(slot.value) is not Referent:
                     ner_row[slot.key.lower()] = slot.value
-                elif slot.key.lower() + "_vars" not in ner_row:
+                elif slot.key.lower() + "_vars" not in ner_row and type(slot.value) is not Referent:
                     ner_row[slot.key.lower() + "_vars"] = [slot.value]
-                elif slot.key.lower() + "_vars" in ner_row:
+                elif slot.key.lower() + "_vars" in ner_row and type(slot.value) is not Referent:
                     ner_row[slot.key.lower() + "_vars"].append(slot.value)
 
                 if slot.key.lower() == "attribute":
@@ -124,6 +116,3 @@ class PullentiAnalyzer:
             dataframe = self._data_helper(dataframe, self.PERSON_RULES)
 
         return dataframe
-
-
-test = PullentiAnalyzer(some_text, params_kwargs={"host": "localhost", "port": 8081})

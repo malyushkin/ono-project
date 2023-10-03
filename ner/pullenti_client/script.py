@@ -1,8 +1,9 @@
 from pullenti_client import Client
+from pullenti_analyzer import PullentiAnalyzer
 
 pullenti_client = Client("localhost", 8081)
 
-demo_text = """
+some_text = """
 Министр внутренних дел федеральной земли Бранденбург Михаэль Штюбген обеспокоен все 
 менее контролируемой ситуацией с наплывом нелегальных мигрантов через границу с 
 соседней Польшей. "Ситуация на границе систематически ухудшается уже многие месяцы. 
@@ -15,5 +16,5 @@ demo_text = """
 нелегалов составляло 22 человека.
 """
 
-result = pullenti_client(demo_text)
-print(result)
+analyzer = PullentiAnalyzer(some_text, params_kwargs={"host": "localhost", "port": 8081})
+print(analyzer.data("GEO"))
