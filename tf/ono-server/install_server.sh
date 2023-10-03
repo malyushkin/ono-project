@@ -57,3 +57,18 @@ docker run -d \
 
 docker exec -it notebook bash -c "sudo apt-get update"
 docker exec -it notebook bash -c "sudo apt install -y graphviz"
+
+# install postgres
+sudo apt-get -y install postgresql-12 postgresql-contrib-12
+sudo -u postgres -i psql --command "CREATE ROLE server SUPERUSER LOGIN PASSWORD 'server';"
+sudo -u postgres -i psql --command "CREATE DATABASE ono_db OWNER 'server';"
+sudo -u postgres -i psql --command "CREATE EXTENSION IF NOT EXISTS 'uuid-ossp';"
+
+# edit config
+cp /etc/postgresql/12/main/postgresql.conf{,.bak}
+cp /etc/postgresql/12/main/pg_hba.conf{,.bak}
+sudo sed -i "64 i listen_addresses = '*'" /etc/postgresql/12/main/postgresql.conf
+sudo sh -c "echo host all all 0.0.0.0/0 md5 >> /etc/postgresql/12/main/pg_hba.conf"
+
+# restart postgresql
+sudo systemctl restart postgresql
