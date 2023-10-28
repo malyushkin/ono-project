@@ -29,7 +29,7 @@ POSTGRE_CONFIG = {
 }
 
 # sql queries
-INSERT_ARTICLE_SQL = "INSERT INTO article(article_id, rima_article_id, title, plain_text, published_dt) VALUES(%s, %s, %s, %s, %s);"
+INSERT_ARTICLE_SQL = "INSERT INTO article(article_id, rima_article_id, title, plain_text, published_dt, source_slug) VALUES(%s, %s, %s, %s, %s, %s);"
 INSERT_ENTITY_SQL = "INSERT INTO entity(entity_id, tag, name) VALUES(%s, %s, %s);"
 INSERT_ENTITY_ATTR_SQL = "INSERT INTO entity_attribute(entity_id, key, value) VALUES(%s, %s, %s);"
 INSERT_ARTICLE_X_ENTITY_SQL = "INSERT INTO article_x_entity(article_id, entity_id) VALUES(%s, %s);"
@@ -78,7 +78,7 @@ def extend_name(text: str, pattern: str, check_name: str, add_name: str):
 with open(args_vars["file"]) as f:
     json_data = json.load(f)
 
-for article_item in json_data[12000:13000]:
+for article_item in json_data:
     try:
         title = extend_name(article_item["title"], "Навальн", "Алекс", "Алексей")
         analyzer = PullentiAnalyzer(title, [], PULLENTI_CONFIG)
@@ -95,7 +95,8 @@ for article_item in json_data[12000:13000]:
                    article_item["rima_id"],
                    article_item["title"],
                    article_item["plain_text"],
-                   article_item["published_dt"])
+                   article_item["published_dt"],
+                   article_item["source_slug"])
         cursor.execute(INSERT_ARTICLE_SQL, article)
 
         for idx, row in ner_data.iterrows():
@@ -118,3 +119,4 @@ for article_item in json_data[12000:13000]:
     except Exception as e:
         print(e)
         print(article_item["rima_id"], article_item["title"])
+        connection.commit()
