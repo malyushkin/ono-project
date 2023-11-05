@@ -36,9 +36,10 @@ POSTGRE_CONFIG = {
     "port": args_vars["pg_port"]
 }
 
-SOURCE_SET = set(args_vars["source"].split(" "))
-print(SOURCE_SET)
+SOURCE_SET = set(args_vars["source"].split(" "));
 SOURCE_SLUG_MAPPER_DATA = source_slug_mapper_maker(SOURCE_SLUG_MAPPER)
+
+print(SOURCE_SET)
 
 psycopg2.extras.register_uuid()
 connection = psycopg2.connect(**POSTGRE_CONFIG)
@@ -156,8 +157,8 @@ if __name__ == "__main__":
     while len(SOURCE_SET):
 
         source = SOURCE_SET.pop()
-        # data = get_raw_data(source) TODO: remove
-        data = get_raw_data(source)[:100]
+        # data = get_raw_data(source)[:120] # for tests
+        data = get_raw_data(source)
 
         for item in data:
             try:
