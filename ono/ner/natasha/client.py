@@ -2,6 +2,7 @@ import natasha
 
 from typing import Any, List, Optional, Set, Union
 
+MODEL_NAME = "natasha"
 NATASHA_KEYS = {"LOC", "ORG", "PER"}
 
 segmenter = natasha.Segmenter()
