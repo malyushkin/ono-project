@@ -1,3 +1,8 @@
+"""
+sudo apt-get install python-apt python-psycopg2
+
+python3 -m pip install .
+"""
 import setuptools
 
 PANDAS_VER = "2.1.1"
