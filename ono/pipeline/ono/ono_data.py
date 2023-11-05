@@ -5,7 +5,7 @@ import psycopg2.extras
 from typing import Any, Dict, List, Set
 from uuid import uuid4
 
-from ono.ner.natasha.client import NatashaClient, MODEL_NAME
+from ner.natasha.client import NatashaClient, MODEL_NAME
 from queries import (
     INSERT_ARTICLE_QUERY,
     INSERT_ENTITY_QUERY,
