@@ -404,3 +404,5 @@ archive/*
 /.idea/vcs.xml
 !/credentials/
 /main/nohup.out
+
+/ono/logs
