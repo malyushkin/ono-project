@@ -5,7 +5,7 @@ import psycopg2.extras
 from typing import Any, Dict, List, Set
 from uuid import uuid4
 
-from ner.natasha.client import NatashaClient, MODEL_NAME
+from ono.ner.natasha.client import NatashaClient, MODEL_NAME
 from queries import (
     INSERT_ARTICLE_QUERY,
     INSERT_ENTITY_QUERY,
@@ -77,6 +77,7 @@ def process_article_ner(article_id, ner_data, is_title=False):
 
     :param article_id:
     :param ner_data:
+    :param is_title:
     :return:
     """
     for ner_item in ner_data:
