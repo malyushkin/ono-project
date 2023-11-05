@@ -5,19 +5,19 @@ import psycopg2.extras
 from typing import Any, Dict, List, Set
 from uuid import uuid4
 
-from ono.ner.natasha.client import NatashaClient, MODEL_NAME
-from queries import (
+from ner.natasha.client import NatashaClient, MODEL_NAME
+from pipeline.ono.queries import (
     INSERT_ARTICLE_QUERY,
     INSERT_ENTITY_QUERY,
     INSERT_ARTICLE_X_ENTITY_QUERY,
     SELECT_ALL_QUERY,
     SELECT_SPEC_ENTITY_QUERY,
 )
-from ono.pipeline.config import (
+from pipeline.config import (
     SOURCE_SLUG_MAPPER,
     SOURCE_STR,
 )
-from ono.pipeline.utils import source_slug_mapper_maker
+from pipeline.utils import source_slug_mapper_maker
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--pg_host", default="localhost")
