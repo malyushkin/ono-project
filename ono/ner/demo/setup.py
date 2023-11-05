@@ -10,7 +10,8 @@ setuptools.setup(
     author_email="malyushkinr@gmail.com",
     packages=setuptools.find_packages(),
     install_requires=[
-        "psycopg2",
+        "jupyter",
+        "psycopg2-binary",
         f"pandas=={PANDAS_VER}",
         f"pullenti-client=={PULLENTI_CLIENT_VER}",
     ],
