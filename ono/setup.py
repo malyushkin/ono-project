@@ -17,6 +17,8 @@ setuptools.setup(
         "jupyter",
         "natasha",
         "psycopg2-binary",
+        "sshtunnel",
+        "sqlalchemy",
         f"pandas=={PANDAS_VER}",
     ],
 )

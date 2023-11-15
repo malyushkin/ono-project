@@ -2,8 +2,11 @@ import argparse
 import sys
 import psycopg2.extras
 
-from typing import Any, Dict, List, Set
+from typing import Any, Dict, List, Set, Optional
 from uuid import uuid4
+from sshtunnel import SSHTunnelForwarder
+# from sqlalchemy import create_engine
+# from sqlalchemy.engine.url import URL
 
 from ner.natasha.client import NatashaClient, MODEL_NAME
 from pipeline.ono.queries import (
@@ -28,22 +31,65 @@ parser.add_argument("-s", "--source", required=False, default=SOURCE_STR)
 args = parser.parse_args()
 args_vars = vars(args)
 
+# Rima SSH
+SSH_HOST = "bastion.de.rima.media"
+SSH_PRIVATE_KEY = "~/.ssh/id_rsa"
+SSH_USERNAME = "rmalushkin"
+SSH_BIND_ADDRESS = "rima-de.cluster-cuacljzqucw0.us-west-2.rds.amazonaws.com"
+
+# Rima Postgre
+POSTGRE_DATABASE = "rima_ext"
+POSTGRE_USER = "rmalushkin"
+POSTGRE_PASSWORD = "efjD#(nKLa"
+
 POSTGRE_CONFIG = {
-    "dbname": "ono_db",
-    "user": "server",
-    "password": "server",
+    "dbname": "rima_ext",
+    "user": POSTGRE_USER,
+    "password": POSTGRE_PASSWORD,
     "host": args_vars["pg_host"],
     "port": args_vars["pg_port"]
 }
 
-SOURCE_SET = set(args_vars["source"].split(" "));
+SOURCE_SET = set(args_vars["source"].split(" "))
 SOURCE_SLUG_MAPPER_DATA = source_slug_mapper_maker(SOURCE_SLUG_MAPPER)
 
 print(SOURCE_SET)
 
 psycopg2.extras.register_uuid()
-connection = psycopg2.connect(**POSTGRE_CONFIG)
-cursor = connection.cursor()
+
+
+def execute_query(query, vars=None) -> Optional[List]:
+    """
+
+    :param query:
+    :return:
+    """
+
+    with SSHTunnelForwarder(
+            (SSH_HOST, 22),
+            ssh_private_key=SSH_PRIVATE_KEY,
+            ssh_username=SSH_USERNAME,
+            remote_bind_address=(SSH_BIND_ADDRESS, 5432),
+    ) as ssh:
+        ssh.start()
+
+        params = POSTGRE_CONFIG.copy()
+        params["port"] = ssh.local_bind_port
+
+        connection = psycopg2.connect(**params)
+
+        cursor = connection.cursor()
+        cursor.execute(query, vars)
+
+        connection.commit()
+
+        ssh.stop()
+
+    if cursor.pgresult_ptr is not None:
+        rows = cursor.fetchall()
+        return rows
+
+    return None
 
 
 def get_raw_data(source_name) -> List:
@@ -53,13 +99,15 @@ def get_raw_data(source_name) -> List:
     :param source_name:
     :return:
     """
+
     _query = SELECT_ALL_QUERY.format(
-        table="archive_articles_master_export",
+        schema="ono",
+        table="archive_ono_master_articles",
         s=source_name
     )
-    cursor.execute(_query)
+    raw_data = execute_query(_query)
 
-    return cursor.fetchall()
+    return raw_data
 
 
 def extract_ner(text) -> Set:
@@ -84,14 +132,14 @@ def process_article_ner(article_id, ner_data, is_title=False):
         ner_name = ner_item[1].replace("'", "''")
 
         _params = {
+            "schema": "ono",
             "table": "entity",
             "m": MODEL_NAME,
             "t": ner_item[0],
             "n": ner_name,
         }
-        _query = SELECT_SPEC_ENTITY_QUERY.format(**_params)
-        cursor.execute(_query)
-        ner_db = cursor.fetchall()
+
+        ner_db = execute_query(SELECT_SPEC_ENTITY_QUERY.format(**_params))
 
         if len(ner_db) > 1:
             raise ValueError
@@ -107,18 +155,14 @@ def process_article_ner(article_id, ner_data, is_title=False):
                 ner_item[0],  # tag
                 ner_name,  # name
             )
-
-            # print(entity)
-            cursor.execute(INSERT_ENTITY_QUERY, entity)
+            execute_query(INSERT_ENTITY_QUERY, entity)
 
         article_x_entity = (
             article_id,
             entity_id,
             is_title,
         )
-
-        # print(article_x_entity)
-        cursor.execute(INSERT_ARTICLE_X_ENTITY_QUERY, article_x_entity)
+        execute_query(INSERT_ARTICLE_X_ENTITY_QUERY, article_x_entity)
 
 
 def process_article(source_item):
@@ -139,18 +183,16 @@ def process_article(source_item):
         SOURCE_SLUG_MAPPER_DATA[item[4]],  # source
     )
 
-    cursor.execute(INSERT_ARTICLE_QUERY, article)
-    connection.commit()
+    execute_query(INSERT_ARTICLE_QUERY, article)
+    # cursor.execute(INSERT_ARTICLE_QUERY, article)
 
     # Extract & insert title NER
     article_ner_data = extract_ner(source_item[1])
     process_article_ner(article_id, article_ner_data, is_title=True)
-    connection.commit()
 
     # Extract & insert plain text NER
     article_ner_data = extract_ner(source_item[2])
     process_article_ner(article_id, article_ner_data, is_title=False)
-    connection.commit()
 
 
 if __name__ == "__main__":
@@ -158,7 +200,9 @@ if __name__ == "__main__":
     while len(SOURCE_SET):
 
         source = SOURCE_SET.pop()
-        # data = get_raw_data(source)[:120] # for tests
+        print(source)  ## TODO: remove
+
+        # data = get_raw_data(source)[:1]  # for tests
         data = get_raw_data(source)
 
         for item in data:
