@@ -213,7 +213,7 @@ if __name__ == "__main__":
 
             data = get_raw_data(source)
 
-            for item in data[:1]:
+            for item in data:
                 try:
                     process_article(item)
 
