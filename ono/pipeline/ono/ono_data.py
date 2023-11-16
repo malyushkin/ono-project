@@ -53,6 +53,8 @@ POSTGRE_CONFIG = {
 SOURCE_SET = set(args_vars["source"].split(" "))
 SOURCE_SLUG_MAPPER_DATA = source_slug_mapper_maker(SOURCE_SLUG_MAPPER)
 
+LOCAL_PORT = 5432
+connection, cursor = None, None
 print(SOURCE_SET)
 
 psycopg2.extras.register_uuid()
@@ -65,25 +67,9 @@ def execute_query(query, vars=None) -> Optional[List]:
     :return:
     """
 
-    with SSHTunnelForwarder(
-            (SSH_HOST, 22),
-            ssh_private_key=SSH_PRIVATE_KEY,
-            ssh_username=SSH_USERNAME,
-            remote_bind_address=(SSH_BIND_ADDRESS, 5432),
-    ) as ssh:
-        ssh.start()
+    # print(cursor)
 
-        params = POSTGRE_CONFIG.copy()
-        params["port"] = ssh.local_bind_port
-
-        connection = psycopg2.connect(**params)
-
-        cursor = connection.cursor()
-        cursor.execute(query, vars)
-
-        connection.commit()
-
-        ssh.stop()
+    cursor.execute(query, vars)
 
     if cursor.pgresult_ptr is not None:
         rows = cursor.fetchall()
@@ -184,16 +170,18 @@ def process_article(source_item):
     )
 
     execute_query(INSERT_ARTICLE_QUERY, article)
+    connection.commit()
     # cursor.execute(INSERT_ARTICLE_QUERY, article)
 
     # Extract & insert title NER
     article_ner_data = extract_ner(source_item[1])
     process_article_ner(article_id, article_ner_data, is_title=True)
+    connection.commit()
 
     # Extract & insert plain text NER
     article_ner_data = extract_ner(source_item[2])
     process_article_ner(article_id, article_ner_data, is_title=False)
-
+    connection.commit()
 
 if __name__ == "__main__":
 
@@ -202,15 +190,39 @@ if __name__ == "__main__":
         source = SOURCE_SET.pop()
         print(source)  ## TODO: remove
 
-        # data = get_raw_data(source)[:1]  # for tests
-        data = get_raw_data(source)
+        with SSHTunnelForwarder(
+                (SSH_HOST, 22),
+                ssh_private_key=SSH_PRIVATE_KEY,
+                ssh_username=SSH_USERNAME,
+                remote_bind_address=(SSH_BIND_ADDRESS, 5432),
+        ) as ssh:
+            ssh.start()
 
-        for item in data:
-            try:
-                process_article(item)
+            # data = get_raw_data(source)[:1]  # for tests
+            LOCAL_PORT = ssh.local_bind_port
 
-            except Exception as e:
-                print(e)
-                print(item[0], item[1])
+            # print(LOCAL_PORT)
 
-        print(f"For source `{source}` {len(data)} items has been added")
+            params = POSTGRE_CONFIG.copy()
+            params["port"] = LOCAL_PORT
+            connection = psycopg2.connect(**params)
+            cursor = connection.cursor()
+
+            # print(connection)
+            # print(cursor)
+
+            data = get_raw_data(source)
+
+            for item in data[:1]:
+                try:
+                    process_article(item)
+
+                except Exception as e:
+                    print(e)
+                    print(item[0], item[1])
+
+            print(f"For source `{source}` {len(data)} items has been added")
+
+            ssh.stop()
+
+            # sys.exit()
