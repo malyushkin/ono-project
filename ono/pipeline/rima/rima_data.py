@@ -210,8 +210,8 @@ if __name__ == "__main__":
             connection = psycopg2.connect(**params)
             cursor = connection.cursor()
 
-            data = get_raw_data(source)[:2]  # for tests
-            # data = get_raw_data(source)
+            # data = get_raw_data(source)[:2]  # for tests
+            data = get_raw_data(source)
 
             for item in data:
                 try:
