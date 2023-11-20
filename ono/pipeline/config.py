@@ -1,4 +1,6 @@
-SOURCE_STR = "5-tv.ru Abnews.ru Belta.by Business-gazeta.ru Echo.msk Fontanka Gazeta.ua Informpskov.ru Interfax Interfax.com.ua Iz Kommersant Lenta.ru Mk Newinform.com News.tut.by Obozrevatel.com Osnmedia Politros.com RT Rbc Regnum Rg Rosbalt Tass Topspb.tv Unian.net Ura.news Vesti Znaj.ua Znak"
+ONO_SOURCE_STR = "5-tv.ru Abnews.ru Belta.by Business-gazeta.ru Echo.msk Fontanka Gazeta.ua Informpskov.ru Interfax Interfax.com.ua Iz Kommersant Lenta.ru Mk Newinform.com News.tut.by Obozrevatel.com Osnmedia Politros.com RT Rbc Regnum Rg Rosbalt Tass Topspb.tv Unian.net Ura.news Vesti Znaj.ua Znak"
+RIMA_SOURCE_STR = "mbk-news meduza novaya polit republic"
+
 SOURCE_SLUG_MAPPER = {
     "5-tv.ru": ["5-tv.ru"],
     "Abnews.ru": ["Abnews.ru"],
@@ -31,4 +33,9 @@ SOURCE_SLUG_MAPPER = {
     "Vesti": ["Vesti"],
     "Znaj.ua": ["Znaj.ua"],
     "Znak": ["Znak"],
+    "Meduza": ["meduza"],
+    "Novaya": ["novaya"],
+    "Polit": ["polit"],
+    "Republic": ["republic"],
+    "MBK": ["mbk-news"]
 }

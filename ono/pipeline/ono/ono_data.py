@@ -18,7 +18,7 @@ from pipeline.ono.queries import (
 )
 from pipeline.config import (
     SOURCE_SLUG_MAPPER,
-    SOURCE_STR,
+    ONO_SOURCE_STR,
 )
 from pipeline.utils import source_slug_mapper_maker
 
@@ -26,7 +26,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--pg_host", default="localhost")
 parser.add_argument("--pg_port", default="5432")
 parser.add_argument("-f", "--file", required=False, help="JSON file name")
-parser.add_argument("-s", "--source", required=False, default=SOURCE_STR)
+parser.add_argument("-s", "--source", required=False, default=ONO_SOURCE_STR)
 
 args = parser.parse_args()
 args_vars = vars(args)
