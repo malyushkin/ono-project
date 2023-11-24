@@ -10,11 +10,12 @@ from sshtunnel import SSHTunnelForwarder
 
 from ner.natasha.client import NatashaClient, MODEL_NAME
 from pipeline.ono.queries import (
-    INSERT_ARTICLE_QUERY,
+    INSERT_ONO_ARTICLE_QUERY,
     INSERT_ENTITY_QUERY,
     INSERT_ARTICLE_X_ENTITY_QUERY,
     SELECT_ALL_QUERY,
     SELECT_SPEC_ENTITY_QUERY,
+    UPDATE_PROCESSED_QUERY,
 )
 from pipeline.config import (
     SOURCE_SLUG_MAPPER,
@@ -53,6 +54,8 @@ POSTGRE_CONFIG = {
 SOURCE_SET = set(args_vars["source"].split(" "))
 SOURCE_SLUG_MAPPER_DATA = source_slug_mapper_maker(SOURCE_SLUG_MAPPER)
 
+BASE_ID = "ONO"
+
 LOCAL_PORT = 5432
 connection, cursor = None, None
 print(SOURCE_SET)
@@ -66,8 +69,6 @@ def execute_query(query, vars=None) -> Optional[List]:
     :param query:
     :return:
     """
-
-    # print(cursor)
 
     cursor.execute(query, vars)
 
@@ -115,7 +116,10 @@ def process_article_ner(article_id, ner_data, is_title=False):
     :return:
     """
     for ner_item in ner_data:
+
         ner_name = ner_item[1].replace("'", "''")
+        if len(ner_item[0]) > 255:
+            raise ValueError
 
         _params = {
             "schema": "ono",
@@ -162,33 +166,36 @@ def process_article(source_item):
     article_id = uuid4()
     article = (
         article_id,
-        item[1],  # title
-        item[2],  # plain_text
-        item[0],  # date
-        item[3],  # link
-        SOURCE_SLUG_MAPPER_DATA[item[4]],  # source
+        source_item[1],  # title
+        source_item[2],  # plain_text
+        source_item[0],  # date
+        source_item[3],  # link
+        SOURCE_SLUG_MAPPER_DATA[source_item[4]],  # source
+        BASE_ID,
+        source_item[9],  # rima id
     )
 
-    execute_query(INSERT_ARTICLE_QUERY, article)
-    connection.commit()
-    # cursor.execute(INSERT_ARTICLE_QUERY, article)
+    execute_query(INSERT_ONO_ARTICLE_QUERY, article)
 
     # Extract & insert title NER
     article_ner_data = extract_ner(source_item[1])
     process_article_ner(article_id, article_ner_data, is_title=True)
-    connection.commit()
 
     # Extract & insert plain text NER
     article_ner_data = extract_ner(source_item[2])
     process_article_ner(article_id, article_ner_data, is_title=False)
-    connection.commit()
+
+    execute_query(UPDATE_PROCESSED_QUERY.format(
+        schema="ono",
+        table="archive_ono_master_articles",
+        id=source_item[9]
+    ))
 
 if __name__ == "__main__":
 
     while len(SOURCE_SET):
 
         source = SOURCE_SET.pop()
-        print(source)  ## TODO: remove
 
         with SSHTunnelForwarder(
                 (SSH_HOST, 22),
@@ -198,31 +205,24 @@ if __name__ == "__main__":
         ) as ssh:
             ssh.start()
 
-            # data = get_raw_data(source)[:1]  # for tests
             LOCAL_PORT = ssh.local_bind_port
-
-            # print(LOCAL_PORT)
-
             params = POSTGRE_CONFIG.copy()
             params["port"] = LOCAL_PORT
             connection = psycopg2.connect(**params)
             cursor = connection.cursor()
-
-            # print(connection)
-            # print(cursor)
 
             data = get_raw_data(source)
 
             for item in data:
                 try:
                     process_article(item)
+                    connection.commit()
 
                 except Exception as e:
                     print(e)
                     print(item[0], item[1])
+                    connection.rollback()
 
             print(f"For source `{source}` {len(data)} items has been added")
 
             ssh.stop()
-
-            # sys.exit()
