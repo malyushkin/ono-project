@@ -28,6 +28,7 @@ SOURCE_SLUG_MAPPER = {
     "Rosbalt": ["Rosbalt"],
     "Tass": ["Tass"],
     "Topspb.tv": ["Topspb.tv"],
+    "Tvrain": ["Tvrain"],
     "Unian.net": ["Unian", "Unian.net"],
     "Ura.news": ["Ura.news"],
     "Vesti": ["Vesti"],
