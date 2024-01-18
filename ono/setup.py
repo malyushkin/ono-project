@@ -16,7 +16,6 @@ setuptools.setup(
     install_requires=[
         "jupyter",
         "natasha",
-        "pandas",
         "psycopg2-binary",
         "sshtunnel",
         "sqlalchemy",
