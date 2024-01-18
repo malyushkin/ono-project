@@ -1,20 +1,19 @@
 import argparse
 import sys
+
+import pandas as pd
 import psycopg2.extras
 
-from typing import Any, Dict, List, Set, Optional
+from typing import List, Set, Optional
 from uuid import uuid4
 from sshtunnel import SSHTunnelForwarder
-# from sqlalchemy import create_engine
-# from sqlalchemy.engine.url import URL
 
 from ner.natasha.client import NatashaClient, MODEL_NAME
 from pipeline.rima.queries import (
-    INSERT_RIMA_ARTICLE_QUERY,
-    INSERT_ENTITY_QUERY,
+    INSERT_ARTICLE_QUERY,
     INSERT_ARTICLE_X_ENTITY_QUERY,
-    SELECT_RAW_QUERY,
-    SELECT_SPEC_ENTITY_QUERY,
+    SELECT_RIMA_RAW_QUERY,
+    SELECT_ENTITIES_DICT_QUERY,
 )
 from pipeline.config import (
     SOURCE_SLUG_MAPPER,
@@ -27,11 +26,13 @@ parser.add_argument("--pg_host", default="localhost")
 parser.add_argument("--pg_port", default="5432")
 parser.add_argument("-f", "--file", required=False, help="JSON file name")
 parser.add_argument("-s", "--source", required=False, default=RIMA_SOURCE_STR)
+parser.add_argument("-y", "--year", required=True)
 
 args = parser.parse_args()
 args_vars = vars(args)
 
-BASE_ID = "RIMA"
+# Rima config
+RIMA_BASE_KEY = "RIMA"
 
 # Rima SSH
 SSH_HOST = "bastion.de.rima.media"
@@ -45,20 +46,17 @@ POSTGRE_USER = "rmalushkin"
 POSTGRE_PASSWORD = "efjD#(nKLa"
 
 POSTGRE_CONFIG = {
-    "dbname": "rima_ext",
     "user": POSTGRE_USER,
     "password": POSTGRE_PASSWORD,
     "host": args_vars["pg_host"],
-    "port": args_vars["pg_port"]
+    "port": args_vars["pg_port"],
 }
 
 SOURCE_SET = set(args_vars["source"].split(" "))
 SOURCE_SLUG_MAPPER_DATA = source_slug_mapper_maker(SOURCE_SLUG_MAPPER)
+YEAR = args_vars["year"]
 
-LOCAL_PORT = 5432
 connection, cursor = None, None
-print(SOURCE_SET)
-
 psycopg2.extras.register_uuid()
 
 
@@ -80,7 +78,7 @@ def execute_query(query, vars=None) -> Optional[List]:
     return None
 
 
-def get_raw_data(source_name) -> List:
+def get_raw_data(source_name) -> List[tuple]:
     """
     Get postgres raw data by source name
 
@@ -88,10 +86,11 @@ def get_raw_data(source_name) -> List:
     :return:
     """
 
-    _query = SELECT_RAW_QUERY.format(
-        schema="ono",
-        table="archive_rima_json_articles",
-        s=source_name
+    _query = SELECT_RIMA_RAW_QUERY.format(
+        schema="public",
+        table="parsed_web_content",
+        year=YEAR,
+        s=source_name,
     )
     raw_data = execute_query(_query)
 
@@ -119,38 +118,23 @@ def process_article_ner(article_id, ner_data, is_title=False):
     for ner_item in ner_data:
         ner_name = ner_item[1].replace("'", "''")
 
-        _params = {
-            "schema": "ono",
-            "table": "entity",
-            "m": MODEL_NAME,
-            "t": ner_item[0],
-            "n": ner_name,
-        }
+        match_pd = entities_pd[
+            (entities_pd["tag"] == ner_item[0]) & (entities_pd["name"] == ner_name)
+        ]
 
-        ner_db = execute_query(SELECT_SPEC_ENTITY_QUERY.format(**_params))
-
-        if len(ner_db) > 1:
+        if match_pd.shape[0] == 0:
+            continue
+        elif match_pd.shape[0] > 1:
             raise ValueError
-
-        elif len(ner_db) == 1:
-            entity_id = ner_db[0][1]
-
-        else:
-            entity_id = uuid4()
-            entity = (
+        elif match_pd.shape[0] == 1:
+            entity_id = match_pd.iloc[0]["entity_id"]
+            article_x_entity = (
+                article_id,
                 entity_id,
-                MODEL_NAME,  # model
-                ner_item[0],  # tag
-                ner_name,  # name
+                is_title,
             )
-            execute_query(INSERT_ENTITY_QUERY, entity)
 
-        article_x_entity = (
-            article_id,
-            entity_id,
-            is_title,
-        )
-        execute_query(INSERT_ARTICLE_X_ENTITY_QUERY, article_x_entity)
+            article_x_entity_batch.append(article_x_entity)
 
 
 def process_article(source_item):
@@ -165,27 +149,24 @@ def process_article(source_item):
     article = (
         article_id,
         source_item[2],  # title
-        source_item[3],  # plain_text
-        source_item[1],  # date
-        source_item[4],  # link
-        SOURCE_SLUG_MAPPER_DATA[source_item[5]],  # source
-        source_item[6],  # mapped genre
-        BASE_ID,
+        source_item[4],  # plain_text
+        source_item[3],  # date
+        source_item[6],  # link
+        SOURCE_SLUG_MAPPER_DATA[source_item[1]],  # source
+        source_item[5],  # mapped genre
+        RIMA_BASE_KEY,
         source_item[0],  # rima id
     )
 
-    execute_query(INSERT_RIMA_ARTICLE_QUERY, article)
-    connection.commit()
+    articles_batch.append(article)
 
     # Extract & insert title NER
     article_ner_data = extract_ner(source_item[2])
     process_article_ner(article_id, article_ner_data, is_title=True)
-    connection.commit()
 
     # Extract & insert plain text NER
-    article_ner_data = extract_ner(source_item[3])
+    article_ner_data = extract_ner(source_item[4])
     process_article_ner(article_id, article_ner_data, is_title=False)
-    connection.commit()
 
 
 if __name__ == "__main__":
@@ -193,7 +174,6 @@ if __name__ == "__main__":
     while len(SOURCE_SET):
 
         source = SOURCE_SET.pop()
-        print(source)  ## TODO: remove
 
         with SSHTunnelForwarder(
                 (SSH_HOST, 22),
@@ -203,15 +183,25 @@ if __name__ == "__main__":
         ) as ssh:
             ssh.start()
 
-            LOCAL_PORT = ssh.local_bind_port
-
             params = POSTGRE_CONFIG.copy()
-            params["port"] = LOCAL_PORT
+            params["port"] = ssh.local_bind_port
+            params["dbname"] = "rima_de"
             connection = psycopg2.connect(**params)
             cursor = connection.cursor()
 
-            # data = get_raw_data(source)[:2]  # for tests
             data = get_raw_data(source)
+
+            connection.close()
+
+            params["dbname"] = "rima_ext"
+            connection = psycopg2.connect(**params)
+            cursor = connection.cursor()
+
+            entities = execute_query(SELECT_ENTITIES_DICT_QUERY)
+            entities_pd = pd.DataFrame(entities, columns=["entity_id", "tag", "name"])
+
+            articles_batch = []
+            article_x_entity_batch = []
 
             for item in data:
                 try:
@@ -221,8 +211,23 @@ if __name__ == "__main__":
                     print(e)
                     print(item[0], item[1])
 
+                if len(articles_batch) == 1000:
+                    cursor.executemany(
+                        INSERT_ARTICLE_QUERY,
+                        articles_batch,
+                    )
+
+                    cursor.executemany(
+                        INSERT_ARTICLE_X_ENTITY_QUERY,
+                        article_x_entity_batch,
+                    )
+
+                    connection.commit()
+
+                    articles_batch = []
+                    article_x_entity_batch = []
+
             print(f"For source `{source}` {len(data)} items has been added")
 
+            connection.close()
             ssh.stop()
-
-            # sys.exit()
