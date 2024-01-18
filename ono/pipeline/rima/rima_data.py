@@ -1,4 +1,5 @@
 import argparse
+import os
 import sys
 
 import pandas as pd
@@ -42,8 +43,8 @@ SSH_BIND_ADDRESS = "rima-de.cluster-cuacljzqucw0.us-west-2.rds.amazonaws.com"
 
 # Rima Postgre
 POSTGRE_DATABASE = "rima_ext"
-POSTGRE_USER = "rmalushkin"
-POSTGRE_PASSWORD = "efjD#(nKLa"
+POSTGRE_USER = os.environ["POSTGRE_USER"]
+POSTGRE_PASSWORD = os.environ["POSTGRE_PASSWORD"]
 
 POSTGRE_CONFIG = {
     "user": POSTGRE_USER,
