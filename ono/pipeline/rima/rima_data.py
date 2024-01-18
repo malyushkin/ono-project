@@ -203,6 +203,8 @@ if __name__ == "__main__":
             articles_batch = []
             article_x_entity_batch = []
 
+            print(f"For source `{source}` - {len(data)} items start...")
+
             for item in data:
                 try:
                     process_article(item)
@@ -227,7 +229,7 @@ if __name__ == "__main__":
                     articles_batch = []
                     article_x_entity_batch = []
 
-            print(f"For source `{source}` {len(data)} items has been added")
+            print(f"For source `{source}` - {len(data)} items has been added")
 
             connection.close()
             ssh.stop()
