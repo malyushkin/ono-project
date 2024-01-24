@@ -153,8 +153,8 @@ def process_article_batch(data_batch, entities_pd):
     with psycopg2.connect(**POSTGRE_CONFIG) as local_conn:
         with local_conn.cursor() as local_cursor:
             local_cursor.executemany(INSERT_ARTICLE_QUERY, articles_batch)
-            local_cursor.executemany(INSERT_ARTICLE_X_ENTITY_QUERY, article_x_entity_batch)
             local_cursor.executemany(INSERT_ENTITY_QUERY, entity_batch)
+            local_cursor.executemany(INSERT_ARTICLE_X_ENTITY_QUERY, article_x_entity_batch)
             local_conn.commit()
 
 
