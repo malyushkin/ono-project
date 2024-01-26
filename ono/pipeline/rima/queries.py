@@ -35,5 +35,10 @@ INSERT_ARTICLE_QUERY = """
 INSERT INTO ono.article(article_id, title, plain_text, published_dt, link_url, source_slug, mapped_genre, base, base_article_id) 
 VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s);"""
 
-INSERT_ENTITY_QUERY = "INSERT INTO ono.entity(entity_id, model, tag, name) VALUES(%s, %s, %s, %s);"
 INSERT_ARTICLE_X_ENTITY_QUERY = "INSERT INTO ono.article_x_entity(article_id, entity_id, is_title) VALUES(%s, %s, %s);"
+INSERT_ENTITY_QUERY = """
+INSERT INTO ono.entity(entity_id, model, tag, name) 
+VALUES(%s, %s, %s, %s)
+ON CONFLICT(model, tag, name)
+DO UPDATE SET entity_id = %s;
+"""
