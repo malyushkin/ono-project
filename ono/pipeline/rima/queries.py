@@ -39,6 +39,6 @@ INSERT_ARTICLE_X_ENTITY_QUERY = "INSERT INTO ono.article_x_entity(article_id, en
 INSERT_ENTITY_QUERY = """
 INSERT INTO ono.entity(entity_id, model, tag, name) 
 VALUES(%s, %s, %s, %s)
-ON CONFLICT(entity_id) 
+ON CONFLICT(model, tag, name)
 DO UPDATE SET entity_id = %s;
 """

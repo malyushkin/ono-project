@@ -195,7 +195,7 @@ if __name__ == "__main__":
 
                 print(f"Processing {len(data)} items from source `{source}`...")
 
-                with ThreadPoolExecutor(32) as executor:
+                with ThreadPoolExecutor(max_workers=32) as executor:
                     executor.map(
                         lambda batch: process_article_batch(batch, entities_pd),
                         data_batches,
