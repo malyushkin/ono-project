@@ -215,7 +215,7 @@ if __name__ == "__main__":
 
             with psycopg2.connect(**params) as connection:
                 with connection.cursor() as cursor:
-                    data = get_raw_data(source)[:200]
+                    data = get_raw_data(source)
 
             batch_size = 1000
             data_batches = [
