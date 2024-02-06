@@ -22,12 +22,17 @@ WHERE date_trunc('year', pwc.published_dt) = '{year}-01-01'
 
 SELECT_SPEC_ENTITY_QUERY = "SELECT * FROM {schema}.{table} WHERE model='{m}' AND tag='{t}' AND name='{n}'"
 
+# SELECT_ENTITIES_DICT_QUERY = """
+# SELECT e.entity_id, e.tag, e.name
+# FROM ono.article_x_entity axe
+#          INNER JOIN ono.entity e ON e.entity_id = axe.entity_id
+# GROUP BY 1, 2, 3
+# HAVING COUNT(*) >= 25
+# """
+
 SELECT_ENTITIES_DICT_QUERY = """
 SELECT e.entity_id, e.tag, e.name
-FROM ono.article_x_entity axe
-         INNER JOIN ono.entity e ON e.entity_id = axe.entity_id
-GROUP BY 1, 2, 3
-HAVING COUNT(*) >= 25
+FROM ono.entity
 """
 
 # INSERT_ARTICLE_QUERY = "INSERT INTO ono.article(article_id, title, plain_text, published_dt, link_url, source_slug) VALUES(%s, %s, %s, %s, %s, %s);"
@@ -40,5 +45,4 @@ INSERT_ENTITY_QUERY = """
 INSERT INTO ono.entity(entity_id, model, tag, name) 
 VALUES(%s, %s, %s, %s)
 ON CONFLICT(model, tag, name)
-DO UPDATE SET entity_id = %s;
-"""
+DO UPDATE SET entity_id = EXCLUDED.entity_id;"""
