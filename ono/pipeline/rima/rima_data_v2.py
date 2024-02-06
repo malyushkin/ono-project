@@ -1,13 +1,14 @@
 import argparse
 import os
 import uuid
-
 import psycopg2
 import psycopg2.extras
 import pandas as pd
+
+from datetime import datetime
 from uuid import uuid4
 from sshtunnel import SSHTunnelForwarder
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from typing import List, Optional, Set
 
 from ner.natasha.client import NatashaClient, MODEL_NAME
@@ -37,7 +38,7 @@ args_vars = vars(args)
 RIMA_BASE_KEY = "RIMA"
 SSH_HOST = "bastion.de.rima.media"
 SSH_PRIVATE_KEY = "~/.ssh/id_rsa"
-SSH_USERNAME = "yurfakov"
+SSH_USERNAME = "rmalushkin"
 SSH_BIND_ADDRESS = "rima-de.cluster-cuacljzqucw0.us-west-2.rds.amazonaws.com"
 POSTGRE_DATABASE = "rima_ext"
 POSTGRE_USER = os.environ["POSTGRE_USER"]
@@ -68,17 +69,62 @@ def get_raw_data(source_name) -> List[tuple]:
 
 
 def extract_ner(text) -> Set:
+    """
+
+    :param text:
+    :return:
+    """
     ner_obj = NatashaClient(f"А {text}")
     return ner_obj.ner()
 
 
+def drop_dupl_data(entity_batch, article_x_entity_batch) -> (list, list):
+    """
+
+    :param entity_batch:
+    :param article_x_entity_batch:
+    :return:
+    """
+    entity_cols = ["entity_id", "model", "tag", "name"]
+    article_x_entity_cols = ["article_id", "entity_id", "is_title"]
+
+    entity_batch_pd = pd.DataFrame.from_records(entity_batch, columns=entity_cols)
+    entity_batch_dd_pd = entity_batch_pd.drop_duplicates(entity_cols[1:], keep="last")
+
+    entity_batch_mapper_pd = entity_batch_pd.merge(
+        entity_batch_dd_pd,
+        how="left",
+        on=entity_cols[1:],
+        suffixes=("", "_actual"),
+    )[["entity_id", "entity_id_actual"]]
+
+    article_x_entity_batch_pd = pd.DataFrame.from_records(
+        article_x_entity_batch,
+        columns=article_x_entity_cols,
+    )
+
+    article_x_entity_batch_actual_pd = (
+        article_x_entity_batch_pd.merge(
+            entity_batch_mapper_pd,
+            how="left",
+            on="entity_id",
+        )
+        .drop("entity_id", axis=1)
+        .rename(columns={"entity_id_actual": "entity_id"})[article_x_entity_cols]
+    )
+
+    return (
+        entity_batch_dd_pd.to_records(index=None).tolist(),
+        article_x_entity_batch_actual_pd.to_records(index=None).tolist(),
+    )
+
+
 def process_article_ner(
-        article_id: uuid.UUID,
-        ner_data: Set,
-        is_title: bool,
-        article_x_entity_batch: List,
-        entity_batch: List,
-        entities_pd: pd.DataFrame
+    article_id: uuid.UUID,
+    ner_data: Set,
+    is_title: bool,
+    article_x_entity_batch: List,
+    entity_batch: List,
 ):
     """
 
@@ -87,36 +133,25 @@ def process_article_ner(
     :param is_title:
     :param article_x_entity_batch:
     :param entity_batch:
-    :param entities_pd:
     :return:
     """
 
     for ner_item in ner_data:
-        ner_name = ner_item[1].replace("'", "''")
-        match_pd = entities_pd[
-            (entities_pd["tag"] == ner_item[0]) & (entities_pd["name"] == ner_name)
-        ]
-
-        if len(match_pd) > 1:
-            raise ValueError("Multiple entity matches found")
-        elif len(match_pd) == 1:
-            entity_id = match_pd.iloc[0]["entity_id"]
-        else:
-            entity_id = uuid4()
-            entity = (
-                entity_id,
-                MODEL_NAME,  # model
-                ner_item[0],  # tag
-                ner_name,  # name
-            )
-            entity_batch.append(entity)
+        entity_id = uuid4()
+        entity = (
+            entity_id,
+            MODEL_NAME,  # model
+            ner_item[0],  # tag
+            ner_item[1].replace("'", "''"),  # name
+        )
+        entity_batch.append(entity)
 
         article_x_entity = (article_id, entity_id, is_title)
         article_x_entity_batch.append(article_x_entity)
 
 
-def process_article_batch(data_batch, entities_pd):
-    articles_batch = []
+def process_source_article_batch(data_batch, params):
+    article_batch = []
     article_x_entity_batch = []
     entity_batch = []
 
@@ -134,7 +169,7 @@ def process_article_batch(data_batch, entities_pd):
                 RIMA_BASE_KEY,
                 item[0],
             )
-            articles_batch.append(article)
+            article_batch.append(article)
 
             # Title and plain text NER processing
             for is_title, text in [(True, item[2]), (False, item[4])]:
@@ -145,16 +180,20 @@ def process_article_batch(data_batch, entities_pd):
                     is_title,
                     article_x_entity_batch,
                     entity_batch,
-                    entities_pd,
                 )
+
         except Exception as e:
             print(f"Error processing article {item[0]}: {e}")
 
-    with psycopg2.connect(**POSTGRE_CONFIG) as local_conn:
+    entity_batch, article_x_entity_batch = drop_dupl_data(
+        entity_batch, article_x_entity_batch
+    )
+
+    with psycopg2.connect(**params) as local_conn:
         with local_conn.cursor() as local_cursor:
-            local_cursor.executemany(INSERT_ARTICLE_QUERY, articles_batch)
-            local_cursor.executemany(INSERT_ARTICLE_X_ENTITY_QUERY, article_x_entity_batch)
+            local_cursor.executemany(INSERT_ARTICLE_QUERY, article_batch)
             local_cursor.executemany(INSERT_ENTITY_QUERY, entity_batch)
+            local_cursor.executemany(INSERT_ARTICLE_X_ENTITY_QUERY, article_x_entity_batch)
             local_conn.commit()
 
 
@@ -185,21 +224,16 @@ if __name__ == "__main__":
 
             params["dbname"] = "rima_ext"
 
-            with psycopg2.connect(**params) as connection:
-                with connection.cursor() as cursor:
-                    entities = execute_query(SELECT_ENTITIES_DICT_QUERY)
-                    entities_pd = pd.DataFrame(
-                        entities,
-                        columns=["entity_id", "tag", "name"],
-                    )
+            print(f"Processing {len(data)} items from source `{source}`...")
 
-                print(f"Processing {len(data)} items from source `{source}`...")
-
-                with ThreadPoolExecutor(max_workers=32) as executor:
+            with ThreadPoolExecutor(max_workers=32) as executor:
+                list(
                     executor.map(
-                        lambda batch: process_article_batch(batch, entities_pd),
+                        lambda batch: process_source_article_batch(batch, params),
                         data_batches,
                     )
+                )
 
-                print(f"Completed processing items from source `{source}`")
+            print(f"Completed processing items from source `{source}`")
+
             ssh.stop()
